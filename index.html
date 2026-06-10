@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#8fd5ff">
+<meta property="og:title" content="🐰💗🐷 A tiny game for Gina">
+<meta property="og:description" content="Bunny &amp; Piglet — a little adventure made with love by David">
+<title>Bunny &amp; Piglet 💕</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#8fd5ff;overflow:hidden;
+    position:fixed;inset:0;touch-action:none;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+"use strict";
+/* ============================== setup ================================== */
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+let W = 0, H = 0, DPR = 1, GY = 0, BX = 0;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  cvs.width = W * DPR; cvs.height = H * DPR;
+  cvs.style.width = W + "px"; cvs.style.height = H + "px";
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  GY = H * 0.8; BX = Math.max(90, Math.min(260, W * 0.3));
+}
+window.addEventListener("resize", resize); resize();
+
+/* ============================== helpers ================================ */
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+const FONT = '"Chalkboard SE","Comic Sans MS","Segoe Print",cursive';
+function txt(s, x, y, px, color, align, weight, alpha){
+  ctx.save();
+  ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+  ctx.fillStyle = color;
+  ctx.font = (weight || 700) + " " + px + "px " + FONT;
+  ctx.textAlign = align || "center"; ctx.textBaseline = "middle";
+  ctx.fillText(s, x, y);
+  ctx.restore();
+}
+function rr(x, y, w, h, r){           // rounded rect path (iOS-safe)
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function drawHeart(x, y, s, color, alpha){
+  ctx.save();
+  ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+  ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, 4);
+  ctx.bezierCurveTo(-8, -4, -4, -12, 0, -6);
+  ctx.bezierCurveTo(4, -12, 8, -4, 0, 4);
+  ctx.fill();
+  ctx.restore();
+}
+function drawCarrot(x, y, s){
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(0.5);
+  ctx.fillStyle = "#ff9344";
+  ctx.beginPath(); ctx.moveTo(-4.5, -5); ctx.lineTo(4.5, -5); ctx.lineTo(0, 8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#6fc466";
+  ctx.beginPath(); ctx.ellipse(-2.5, -7.5, 1.7, 4, -0.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(2.5, -7.5, 1.7, 4, 0.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -8.5, 1.7, 4.4, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+/* ============================== audio ================================== */
+let AC = null;
+function sndInit(){
+  if (!AC){ try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
+  if (AC && AC.state === "suspended") AC.resume();
+}
+function blip(freq, dur, type, vol, delay){
+  if (!AC) return;
+  const t = AC.currentTime + (delay || 0);
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || "sine"; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol || 0.1, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+const sHop   = () => { blip(300, 0.1, "triangle", 0.08); blip(440, 0.12, "triangle", 0.06, 0.05); };
+const sHeart = () => { blip(740, 0.09, "sine", 0.09); blip(988, 0.14, "sine", 0.09, 0.07); };
+const sNom   = () => { blip(220, 0.08, "square", 0.05); blip(180, 0.08, "square", 0.05, 0.09); };
+const sHug   = () => [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.18, "sine", 0.09, i * 0.11));
+const sOink  = () => { blip(180, 0.07, "sawtooth", 0.05); blip(240, 0.1, "sawtooth", 0.05, 0.07); };
+
+/* ============================ characters =============================== */
+/* origin = ground point under feet; face: 1 = facing right, -1 = left */
+function drawBunny(x, y, t, o){
+  o = o || {};
+  const face = o.face || 1, vy = o.vy || 0;
+  const run = o.run ? Math.sin(t * 13) : 0;
+  const flop = clamp(vy / 2200, -0.35, 0.35) + Math.sin(t * 2.1) * 0.05;
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(face, 1);
+  if (o.lean) ctx.rotate(o.lean);
+  // shadow
+  ctx.fillStyle = "rgba(60,60,90,0.13)";
+  ctx.beginPath(); ctx.ellipse(0, 1, 26, 5, 0, 0, 7); ctx.fill();
+  // tail
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath(); ctx.arc(-25, -24, 7.5, 0, 7); ctx.fill();
+  // legs
+  ctx.beginPath(); ctx.ellipse(-8, -6 + run * 2.5, 7, 5.5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(10, -6 - run * 2.5, 7, 5.5, 0, 0, 7); ctx.fill();
+  // ears (behind head)
+  for (const e of [{dx: 8, a: -0.32}, {dx: 16, a: 0.1}]){
+    ctx.save();
+    ctx.translate(e.dx, -56);
+    ctx.rotate(e.a + flop);
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.ellipse(0, -12, 5.8, 15.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ffc2d4";
+    ctx.beginPath(); ctx.ellipse(0, -11, 2.9, 10.5, 0, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  // body + head
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath(); ctx.ellipse(0, -22, 24, 18.5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(14, -45, 16.5, 0, 7); ctx.fill();
+  // eye
+  if (o.happy){
+    ctx.strokeStyle = "#4a3c46"; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(20, -46, 3.2, Math.PI, 2 * Math.PI); ctx.stroke();
+  } else {
+    ctx.fillStyle = "#4a3c46";
+    ctx.beginPath(); ctx.arc(20, -47, 2.7, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(21, -48, 1, 0, 7); ctx.fill();
+  }
+  // nose + mouth
+  ctx.fillStyle = "#ff9bb5";
+  ctx.beginPath(); ctx.arc(29.5, -43, 2.2, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#d98aa0"; ctx.lineWidth = 1.4; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.arc(27.5, -39.5, 2.6, 0.15, Math.PI - 0.4); ctx.stroke();
+  // blush
+  ctx.fillStyle = "rgba(255,140,165,0.4)";
+  ctx.beginPath(); ctx.arc(21, -39, 3.6, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawPiglet(x, y, t, o){
+  o = o || {};
+  const face = o.face || 1;
+  const bnc = Math.sin(t * 3.1) * 2;
+  ctx.save();
+  ctx.translate(x, y + bnc * 0.4); ctx.scale(face, 1);
+  if (o.lean) ctx.rotate(o.lean);
+  // shadow
+  ctx.fillStyle = "rgba(60,60,90,0.13)";
+  ctx.beginPath(); ctx.ellipse(0, 1, 27, 5, 0, 0, 7); ctx.fill();
+  // curly tail
+  ctx.strokeStyle = "#f08bab"; ctx.lineWidth = 3; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.arc(-28, -26, 4.5, Math.PI * 0.4, Math.PI * 1.8); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-30, -29, 2.5, Math.PI * 1.1, Math.PI * 2.3); ctx.stroke();
+  // legs
+  ctx.fillStyle = "#f59ab8";
+  ctx.beginPath(); ctx.ellipse(-9, -5.5, 6.5, 5.5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(9, -5.5, 6.5, 5.5, 0, 0, 7); ctx.fill();
+  // body + head
+  ctx.fillStyle = "#ffb3c8";
+  ctx.beginPath(); ctx.ellipse(0, -21, 26, 18.5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(15, -41, 15.5, 0, 7); ctx.fill();
+  // ears: little folded triangles
+  ctx.fillStyle = "#f08bab";
+  ctx.beginPath(); ctx.moveTo(5, -52); ctx.quadraticCurveTo(3, -62, 12, -58);
+  ctx.quadraticCurveTo(11, -52, 8, -50); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(17, -54); ctx.quadraticCurveTo(18, -64, 26, -57);
+  ctx.quadraticCurveTo(23, -52, 19, -51); ctx.closePath(); ctx.fill();
+  // snout
+  ctx.fillStyle = "#f08bab";
+  ctx.beginPath(); ctx.ellipse(28.5, -39, 6.8, 5.4, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#c2607f";
+  ctx.beginPath(); ctx.arc(26.7, -39.5, 1.2, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(30.5, -39.5, 1.2, 0, 7); ctx.fill();
+  // eye
+  if (o.happy){
+    ctx.strokeStyle = "#5a3142"; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(19, -45, 3.2, Math.PI, 2 * Math.PI); ctx.stroke();
+  } else {
+    ctx.fillStyle = "#5a3142";
+    ctx.beginPath(); ctx.arc(19, -46, 2.7, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(20, -47, 1, 0, 7); ctx.fill();
+  }
+  // blush
+  ctx.fillStyle = "rgba(255,110,150,0.4)";
+  ctx.beginPath(); ctx.arc(19.5, -37.5, 3.8, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+/* ============================== levels ================================= */
+const LEVELS = [
+  { sky: ["#8fd5ff", "#eafaff"], hillFar: "#b9e598", hillNear: "#97d877",
+    ground: "#7fcf64", grass: "#6cbd54", night: false, sunset: false,
+    flow: ["#ff8fb3", "#ffd166", "#ffffff", "#c9a6ff"], len: 2300,
+    msg: ["Gina! 💗", "You make my heart hop."] },
+  { sky: ["#ff9e7d", "#ffe2b0"], hillFar: "#e0b97f", hillNear: "#c9a05e",
+    ground: "#b78f50", grass: "#a37f45", night: false, sunset: true,
+    flow: ["#ff6f91", "#fff1b8", "#ffb3c8"], len: 2700,
+    msg: ["You're oink-credibly cute 🐷", "and I'm somebunny", "very lucky."] },
+  { sky: ["#23265c", "#56519c"], hillFar: "#3b3e7d", hillNear: "#2f3269",
+    ground: "#282b5e", grass: "#222451", night: true, sunset: false,
+    flow: ["#9fd8ff", "#ffe9a8", "#ffb3d9"], len: 3100,
+    msg: ["No matter the level,", "I will always", "hop to you. 💕"] },
+];
+
+/* ============================ game state =============================== */
+let state = "title";       // title | play | reach | card | finale
+let levelI = 0, scroll = 0, t = 0;
+let by = 0, vy = 0, hops = 2, hopCount = 0, bxOff = 0;
+let heartsGot = 0, hugT = -1, finT = 0, oinkT = 0;
+let hearts = [], flowers = [], clouds = [], stars = [], parts = [], pigX = 0;
+
+function genLevel(i){
+  const L = LEVELS[i];
+  hearts = [];
+  let x = 520;
+  while (x < L.len - 150){
+    const n = Math.random() < 0.45 ? 3 : 1;
+    const base = rand(60, 200);
+    for (let k = 0; k < n; k++){
+      hearts.push({ x: x + k * 72,
+        hy: base + (n > 1 ? Math.sin(k / (n - 1) * Math.PI) * 55 : 0),
+        taken: false, ph: rand(0, 6.28),
+        carrot: n === 1 && Math.random() < 0.14 });
+    }
+    x += rand(140, 250) + n * 72;
+  }
+  flowers = [];
+  for (let f = 0; f < 50; f++)
+    flowers.push({ x: rand(150, L.len + W), c: pick(L.flow), s: rand(0.7, 1.3) });
+  clouds = [];
+  for (let c = 0; c < 6; c++)
+    clouds.push({ x: rand(0, W + 400), y: rand(H * 0.06, H * 0.32), s: rand(0.6, 1.4), v: rand(4, 11) });
+  stars = [];
+  if (L.night)
+    for (let s = 0; s < 60; s++)
+      stars.push({ x: rand(0, W), y: rand(0, GY * 0.85), r: rand(0.6, 1.8), ph: rand(0, 6.28) });
+  pigX = L.len + W * 0.75;
+  scroll = 0; by = 0; vy = 0; hops = 2; bxOff = 0; hugT = -1;
+  state = "play";
+}
+
+/* ============================ particles ================================ */
+function addPart(p){ p.maxLife = p.life; parts.push(p); }
+function burst(x, y, n, spread){
+  for (let i = 0; i < n; i++)
+    addPart({ x: x + rand(-10, 10), y: y + rand(-10, 10),
+      vx: rand(-(spread || 60), spread || 60), vy: rand(-150, -40),
+      g: 60, life: rand(0.8, 1.5), type: "heart",
+      size: rand(0.7, 1.6), color: pick(["#ff5e8a", "#ff8fb3", "#ffb3c8"]) });
+}
+function popText(x, y, s, color, px){
+  addPart({ x: x, y: y, vx: 0, vy: -42, g: 0, life: 1.1,
+    type: "text", txt: s, color: color || "#ffffff", px: px || 17 });
+}
+function updateParts(dt){
+  for (let i = parts.length - 1; i >= 0; i--){
+    const p = parts[i];
+    p.vy += (p.g || 0) * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.wob) p.x += Math.sin(t * 4 + p.wob) * 40 * dt;
+    p.life -= dt;
+    if (p.life <= 0) parts.splice(i, 1);
+  }
+}
+function drawParts(){
+  for (const p of parts){
+    const a = clamp(p.life / p.maxLife, 0, 1);
+    if (p.type === "heart") drawHeart(p.x, p.y, p.size, p.color, a);
+    else txt(p.txt, p.x, p.y, p.px, p.color, "center", 700, a);
+  }
+}
+
+/* ============================= scenery ================================= */
+function drawSky(L){
+  const g = ctx.createLinearGradient(0, 0, 0, GY);
+  g.addColorStop(0, L.sky[0]); g.addColorStop(1, L.sky[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, GY + 2);
+  if (L.night){
+    for (const s of stars){
+      ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.7 + s.ph));
+      ctx.fillStyle = "#fff7d9";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // moon
+    ctx.fillStyle = "#fff3c4";
+    ctx.beginPath(); ctx.arc(W * 0.8, H * 0.14, 26, 0, 7); ctx.fill();
+    ctx.fillStyle = L.sky[0];
+    ctx.beginPath(); ctx.arc(W * 0.8 + 11, H * 0.14 - 7, 21, 0, 7); ctx.fill();
+  } else {
+    const sx = W * 0.82, sy = L.sunset ? H * 0.3 : H * 0.15, sr = L.sunset ? 38 : 30;
+    ctx.fillStyle = L.sunset ? "rgba(255,240,210,0.95)" : "rgba(255,250,200,0.95)";
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, 7); ctx.fill();
+    ctx.fillStyle = L.sunset ? "rgba(255,230,190,0.3)" : "rgba(255,250,200,0.3)";
+    ctx.beginPath(); ctx.arc(sx, sy, sr * 1.7, 0, 7); ctx.fill();
+  }
+  // clouds
+  ctx.fillStyle = L.night ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.85)";
+  for (const c of clouds){
+    const wrap = W + 400;
+    let cx = (c.x - scroll * 0.12 + t * c.v) % wrap;
+    if (cx < -200) cx += wrap;
+    ctx.beginPath();
+    ctx.arc(cx, c.y, 17 * c.s, 0, 7);
+    ctx.arc(cx + 18 * c.s, c.y + 4 * c.s, 13 * c.s, 0, 7);
+    ctx.arc(cx - 18 * c.s, c.y + 5 * c.s, 12 * c.s, 0, 7);
+    ctx.fill();
+  }
+}
+function drawHillLayer(color, sc, yBase, par){
+  const span = 130 * sc;
+  let off = -((scroll * par) % span);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.rect(0, yBase, W, GY - yBase + 4);
+  for (let x = off - span; x < W + span; x += span){
+    ctx.moveTo(x + 80 * sc, yBase);
+    ctx.arc(x, yBase, 80 * sc, 0, Math.PI, true);
+  }
+  ctx.fill();
+}
+function drawGround(L){
+  ctx.fillStyle = L.ground; ctx.fillRect(0, GY, W, H - GY);
+  // grass tufts
+  ctx.strokeStyle = L.grass; ctx.lineWidth = 2; ctx.lineCap = "round";
+  const span = 26;
+  let off = -(scroll % span);
+  ctx.beginPath();
+  for (let x = off; x < W + span; x += span){
+    ctx.moveTo(x, GY + 3); ctx.lineTo(x - 3, GY - 5);
+    ctx.moveTo(x + 8, GY + 3); ctx.lineTo(x + 11, GY - 4);
+  }
+  ctx.stroke();
+  // flowers
+  for (const f of flowers){
+    const fx = f.x - scroll;
+    if (fx < -20 || fx > W + 20) continue;
+    const fy = GY + 8 + ((f.x * 7) % 18);
+    ctx.fillStyle = f.c;
+    for (let p = 0; p < 5; p++){
+      const a = p / 5 * Math.PI * 2 + f.x;
+      ctx.beginPath();
+      ctx.arc(fx + Math.cos(a) * 3.4 * f.s, fy + Math.sin(a) * 3.4 * f.s, 2.4 * f.s, 0, 7);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#fff3b0";
+    ctx.beginPath(); ctx.arc(fx, fy, 2 * f.s, 0, 7); ctx.fill();
+  }
+}
+function drawScene(L){
+  drawSky(L);
+  drawHillLayer(L.hillFar, 1.5, GY - 40, 0.25);
+  drawHillLayer(L.hillNear, 1.0, GY - 12, 0.5);
+  drawGround(L);
+}
+
+/* =============================== HUD =================================== */
+function drawHUD(L){
+  const topPad = Math.max(18, H * 0.045);
+  drawHeart(26, topPad + 8, 1.5, "#ff5e8a");
+  txt("× " + heartsGot, 42, topPad + 8, 19, "#ffffff", "left");
+  // progress pill
+  const pw = Math.min(180, W * 0.4), px0 = W - pw - 42, py = topPad + 2;
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  rr(px0, py, pw, 12, 6); ctx.fill();
+  const p = clamp(scroll / L.len, 0, 1);
+  ctx.fillStyle = "#ff8fb3";
+  rr(px0, py, Math.max(12, pw * p), 12, 6); ctx.fill();
+  txt("🐷", px0 + pw + 16, py + 6, 15, "#fff");
+}
+
+/* ============================ play/reach =============================== */
+function updatePlay(dt){
+  const L = LEVELS[levelI];
+  const SPD = 205;
+  if (state === "play"){
+    scroll += SPD * dt;
+    if (scroll >= L.len) state = "reach";
+  } else { // reach
+    if (pigX - scroll > W * 0.68) scroll += SPD * dt;
+    else if (hugT < 0){
+      bxOff += 175 * dt;
+      // piglet oinks while waiting
+      oinkT -= dt;
+      if (oinkT <= 0){ popText(pigX - scroll, GY - 92, "oink!", "#ffd7e4", 15); sOink(); oinkT = rand(1.2, 2.2); }
+      if (BX + bxOff >= (pigX - scroll) - 62){
+        hugT = 0; sHug();
+        burst(BX + bxOff + 30, GY - 70, 16, 90);
+      }
+    }
+  }
+  if (hugT >= 0){
+    hugT += dt;
+    if (hugT > 0.8 && hugT < 0.85) burst(BX + bxOff + 30, GY - 90, 6, 60);
+    if (hugT > 1.7) state = "card";
+  } else {
+    vy += 2400 * dt; by += vy * dt;
+    if (by > 0){ by = 0; vy = 0; hops = 2; }
+  }
+  // collect
+  const bx = BX + bxOff, bcy = GY + by - 36;
+  for (const h of hearts){
+    if (h.taken) continue;
+    const hx = h.x - scroll;
+    if (hx < -40) continue;
+    if (hx > W + 40) break;
+    const hy = GY - h.hy + Math.sin(t * 2 + h.ph) * 6;
+    const dx = hx - bx, dy = hy - bcy;
+    if (dx * dx + dy * dy < 1600){
+      h.taken = true; heartsGot++;
+      if (h.carrot){ sNom(); popText(hx, hy - 14, "nom nom!", "#ffe9b8", 15); }
+      else sHeart();
+      burst(hx, hy, 4, 45);
+    }
+  }
+  updateParts(dt);
+}
+function renderPlay(){
+  const L = LEVELS[levelI];
+  drawScene(L);
+  // hearts & carrots
+  for (const h of hearts){
+    if (h.taken) continue;
+    const hx = h.x - scroll;
+    if (hx < -30 || hx > W + 30) continue;
+    const hy = GY - h.hy + Math.sin(t * 2 + h.ph) * 6;
+    if (h.carrot) drawCarrot(hx, hy, 1.5);
+    else drawHeart(hx, hy, 1.9, "#ff5e8a");
+  }
+  // piglet waiting at the end
+  const px = pigX - scroll;
+  if (px < W + 60){
+    const hugging = hugT >= 0;
+    drawPiglet(px - (hugging ? 8 : 0), GY, t,
+      { face: -1, happy: hugging, lean: hugging ? 0.12 : 0 });
+  }
+  // bunny
+  const hugging = hugT >= 0;
+  drawBunny(BX + bxOff, GY + by, t,
+    { vy: vy, run: by === 0 && !hugging, happy: hugging, face: 1, lean: hugging ? -0.12 : 0 });
+  if (hugging){
+    const cx = BX + bxOff + 31;
+    drawHeart(cx, GY - 105 - Math.sin(t * 4) * 4, 2.6 + Math.sin(t * 6) * 0.3, "#ff4d7e");
+  }
+  drawParts();
+  drawHUD(L);
+  // gentle hint, first level only — fades out as she plays
+  if (levelI === 0 && scroll < 760 && hugT < 0)
+    txt("tap to hop!", BX + 14, GY - 138, 19, "#ffffff", "center", 700,
+        clamp((760 - scroll) / 320, 0, 1) * (0.6 + 0.4 * Math.sin(t * 5)));
+}
+
+/* =============================== card ================================== */
+function renderCard(){
+  renderPlay();
+  ctx.fillStyle = "rgba(40,30,60,0.35)"; ctx.fillRect(0, 0, W, H);
+  const cw = Math.min(W * 0.86, 460), lines = LEVELS[levelI].msg;
+  const lh = 34, ch = lines.length * lh + 110;
+  const cx = (W - cw) / 2, cy = (H - ch) / 2 - H * 0.04;
+  ctx.fillStyle = "rgba(255,255,255,0.97)";
+  rr(cx, cy, cw, ch, 26); ctx.fill();
+  drawHeart(W / 2, cy + 38, 2.6 + Math.sin(t * 5) * 0.25, "#ff5e8a");
+  lines.forEach((s, i) =>
+    txt(s, W / 2, cy + 78 + i * lh, 23, "#b3486e"));
+  txt("tap ♥", W / 2, cy + ch - 28, 17, "#d98aa0", "center", 700,
+      0.6 + 0.4 * Math.sin(t * 4));
+}
+
+/* =============================== title ================================= */
+function renderTitle(){
+  drawScene(LEVELS[0]);
+  const cy = GY - 4;
+  drawBunny(W / 2 - 72, cy, t, { face: 1, happy: true });
+  drawPiglet(W / 2 + 72, cy, t, { face: -1, happy: true });
+  drawHeart(W / 2, cy - 92 - Math.sin(t * 3) * 6, 2.4 + Math.sin(t * 5) * 0.25, "#ff4d7e");
+  if (Math.random() < 0.03)
+    addPart({ x: W / 2 + rand(-50, 50), y: cy - 60, vx: 0, vy: -34, g: 0,
+      life: 2, type: "heart", size: rand(0.6, 1.1), color: "#ff8fb3", wob: rand(0, 6) });
+  updateParts(0.016); drawParts();
+  const ty = H * 0.2;
+  txt("Bunny ♥ Piglet", W / 2 + 2, ty + 2, Math.min(36, W * 0.088), "rgba(120,60,90,0.25)");
+  txt("Bunny ♥ Piglet", W / 2, ty, Math.min(36, W * 0.088), "#ffffff");
+  txt("a tiny adventure for Gina", W / 2, ty + 46, 19, "#fff0f5");
+  txt("made with love by your bunny, David", W / 2, ty + 74, 15, "#ffe3ee");
+  txt("tap to begin 🐰", W / 2, H * 0.62, 21, "#ffffff", "center", 700,
+      0.55 + 0.45 * Math.sin(t * 4));
+}
+
+/* ============================== finale ================================= */
+function renderFinale(dt){
+  const L = LEVELS[2];
+  scroll = 0;
+  drawSky(L);
+  drawHillLayer(L.hillFar, 1.5, GY - 40, 0);
+  drawHillLayer(L.hillNear, 1.0, GY - 12, 0);
+  ctx.fillStyle = L.ground; ctx.fillRect(0, GY, W, H - GY);
+  // fireflies
+  if (Math.random() < 0.05)
+    addPart({ x: rand(20, W - 20), y: rand(GY - 160, GY + 30), vx: rand(-12, 12),
+      vy: rand(-14, -4), g: 0, life: rand(2, 3.5), type: "heart",
+      size: 0.35, color: "#ffe9a8", wob: rand(0, 6) });
+  // picnic blanket
+  const bw = Math.min(W * 0.74, 380), bx0 = W / 2 - bw / 2, by0 = GY - 10, bh = 56;
+  ctx.save();
+  rr(bx0, by0, bw, bh, 12); ctx.clip();
+  ctx.fillStyle = "#e8556f"; ctx.fillRect(bx0, by0, bw, bh);
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  const cs = 24;
+  for (let ix = 0; ix < bw / cs + 1; ix++)
+    for (let iy = 0; iy < bh / cs + 1; iy++)
+      if ((ix + iy) % 2 === 0) ctx.fillRect(bx0 + ix * cs, by0 + iy * cs, cs, cs);
+  ctx.restore();
+  // basket
+  ctx.fillStyle = "#b07a45";
+  rr(W / 2 - 17, by0 - 18, 34, 22, 6); ctx.fill();
+  ctx.strokeStyle = "#8a5c30"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(W / 2, by0 - 18, 13, Math.PI, 2 * Math.PI); ctx.stroke();
+  // the happy couple
+  drawBunny(W / 2 - 78, by0 + 12, t, { face: 1, happy: true, lean: -0.06 });
+  drawPiglet(W / 2 + 78, by0 + 12, t, { face: -1, happy: true, lean: 0.06 });
+  drawHeart(W / 2, by0 - 78 - Math.sin(t * 3) * 5, 3.4 + Math.sin(t * 5) * 0.4, "#ff4d7e");
+  updateParts(dt); drawParts();
+  // words
+  const ty = H * 0.22;
+  txt("I love you, Gina!", W / 2 + 2, ty + 2, Math.min(34, W * 0.082), "rgba(20,15,50,0.5)");
+  txt("I love you, Gina!", W / 2, ty, Math.min(34, W * 0.082), "#ffffff");
+  drawHeart(W / 2, ty - 52 - Math.sin(t * 3) * 3, 1.6, "#ff8fb3");
+  txt("forever your bunny, David", W / 2, ty + 42, 18, "#ffd7e4");
+  txt("hearts collected: " + heartsGot + "   (real total: ∞)", W / 2, ty + 72, 14, "#bdb7f0");
+  txt("tap anywhere for more love ♥", W / 2, H * 0.9, 14, "#9c95d8", "center", 700,
+      0.5 + 0.4 * Math.sin(t * 3));
+  txt("↺ play again", W / 2, H * 0.95, 13, "#7d76c2");
+}
+
+/* =============================== input ================================= */
+function tap(x, y){
+  sndInit();
+  if (state === "title"){ levelI = 0; heartsGot = 0; parts = []; genLevel(0); }
+  else if (state === "play" || state === "reach"){
+    if (hugT < 0 && hops > 0){
+      vy = -780; hops--; by -= 0.001; hopCount++;
+      sHop();
+      if (hopCount % 5 === 2) popText(BX + bxOff, GY - 90, "boing!", "#ffffff", 15);
+    }
+  }
+  else if (state === "card"){
+    parts = []; levelI++;
+    if (levelI < LEVELS.length) genLevel(levelI);
+    else { state = "finale"; genLevel.lastT = 0; scroll = 0;
+           stars = []; for (let s = 0; s < 70; s++)
+             stars.push({ x: rand(0, W), y: rand(0, GY * 0.85), r: rand(0.6, 1.9), ph: rand(0, 6.28) }); }
+  }
+  else if (state === "finale"){
+    if (y > H * 0.92){ state = "title"; parts = []; return; }
+    burst(x, y, 7, 70); sHeart();
+    if (Math.random() < 0.4)
+      popText(x, y - 30, pick(["oink! 💕", "hop hop 💗", "love you!", "boing!", "🐰💗🐷"]),
+              "#ffd7e4", 16);
+  }
+}
+window.addEventListener("touchstart", e => {
+  e.preventDefault();
+  const tt = e.changedTouches[0];
+  tap(tt.clientX, tt.clientY);
+}, { passive: false });
+window.addEventListener("mousedown", e => tap(e.clientX, e.clientY));
+window.addEventListener("touchmove", e => e.preventDefault(), { passive: false });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && AC && AC.state === "suspended") AC.resume();
+});
+
+/* =============================== loop ================================== */
+let last = 0;
+function loop(ts){
+  const dt = clamp((ts - last) / 1000 || 0.016, 0.001, 0.033);
+  last = ts; t += dt;
+  if (state === "play" || state === "reach") { updatePlay(dt); renderPlay(); }
+  else if (state === "card") renderCard();
+  else if (state === "finale") renderFinale(dt);
+  else renderTitle();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
