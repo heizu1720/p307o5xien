@@ -102,14 +102,8 @@ const sHeart = () => { blip(740, 0.09, "sine", 0.09); blip(988, 0.14, "sine", 0.
 const sNom   = () => { blip(220, 0.08, "square", 0.05); blip(180, 0.08, "square", 0.05, 0.09); };
 const sHug   = () => [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.18, "sine", 0.09, i * 0.11));
 const sOink  = () => { blip(180, 0.07, "sawtooth", 0.05); blip(240, 0.1, "sawtooth", 0.05, 0.07); };
-const sCombo = n => { blip(440 + 110 * Math.min(n, 8), 0.09, "sine", 0.08);
-                      blip(660 + 110 * Math.min(n, 8), 0.12, "sine", 0.06, 0.06); };
 const sBoing = () => { blip(220, 0.12, "triangle", 0.09); blip(440, 0.14, "triangle", 0.08, 0.07);
                        blip(660, 0.18, "triangle", 0.06, 0.14); };
-const sBoop  = () => { blip(150, 0.08, "square", 0.05); blip(260, 0.1, "square", 0.05, 0.06); };
-const sBoost = () => { blip(330, 0.1, "sawtooth", 0.05); blip(550, 0.1, "sawtooth", 0.05, 0.07);
-                       blip(880, 0.14, "sawtooth", 0.04, 0.14); };
-const sGold  = () => [880, 1109, 1319, 1760].forEach((f, i) => blip(f, 0.12, "sine", 0.07, i * 0.06));
 const sFw    = () => { blip(160, 0.4, "sine", 0.04); blip(1200, 0.25, "sine", 0.03, 0.05);
                        blip(900, 0.3, "sine", 0.03, 0.12); };
 
@@ -229,7 +223,6 @@ function drawButterfly(x, y, ph, c){
   ctx.beginPath(); ctx.ellipse( 3.4, 3, 4.6 * flap + 1.2, 3.6,  0.9, 0, 7); ctx.fill();
   ctx.fillStyle = "#5a4a55";
   ctx.beginPath(); ctx.ellipse(0, 0, 1.7, 5.2, 0, 0, 7); ctx.fill();
-  drawHeart(0, 16, 1.0, "#ff5e8a");
   ctx.restore();
 }
 function drawPad(x, y, hitT){
@@ -247,27 +240,6 @@ function drawPad(x, y, hitT){
   ctx.fillStyle = "#ff8fb3";
   ctx.beginPath(); ctx.ellipse(-7, -33, 6, 10, -0.25, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse( 7, -33, 6, 10,  0.25, 0, 7); ctx.fill();
-  ctx.restore();
-  txt("↑", x, y - 58 - bob, 15, "#ffffff", "center", 700, 0.45 + 0.35 * Math.sin(t * 4 + x));
-}
-function drawSnail(x, y, boopT){
-  const sq = clamp((t - boopT) / 0.4, 0, 1);
-  ctx.save(); ctx.translate(x, y);
-  ctx.scale(1 + 0.3 * (1 - sq), 1 - 0.3 * (1 - sq));
-  ctx.fillStyle = "#e8cba0";
-  ctx.beginPath(); ctx.ellipse(2, -5, 15, 5.5, 0, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.arc(14, -10, 4.6, 0, 7); ctx.fill();
-  ctx.strokeStyle = "#cdb084"; ctx.lineWidth = 1.4; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(15, -14); ctx.lineTo(17, -19); ctx.moveTo(12, -14); ctx.lineTo(12, -19); ctx.stroke();
-  ctx.fillStyle = "#cdb084";
-  ctx.beginPath(); ctx.arc(17, -19.5, 1.2, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.arc(12, -19.5, 1.2, 0, 7); ctx.fill();
-  ctx.fillStyle = "#5a4a55";
-  ctx.beginPath(); ctx.arc(15.5, -10.5, 1.1, 0, 7); ctx.fill();
-  ctx.fillStyle = "#c9a0e8";
-  ctx.beginPath(); ctx.arc(-3, -11, 8.6, 0, 7); ctx.fill();
-  ctx.strokeStyle = "#a87fc9"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(-3, -11, 4.6, 0.6, 5.2); ctx.stroke();
   ctx.restore();
 }
 function drawTree(x, y, s, kind){
@@ -381,16 +353,15 @@ const LEVELS = [
 ];
 
 /* ============================ game state =============================== */
-let state = "title";       // title | play | reach | bonus | card | finale
+let state = "title";       // title | play | reach | card | finale
 let levelI = 0, scroll = 0, t = 0;
 let by = 0, vy = 0, hops = 2, hopCount = 0, bxOff = 0;
 let heartsGot = 0, hugT = -1, finT = 0, oinkT = 0;
 let hearts = [], flowers = [], clouds = [], stars = [], parts = [], pigX = 0;
-let flies = [], pads = [], snails = [], trees = [];
-let comboN = 0, comboT = 0, boostT = 0, airT = 0, landT = 0, wxT = 0, fwT = 0;
+let flies = [], pads = [], trees = [];
+let airT = 0, landT = 0, wxT = 0, fwT = 0;
 let bannerT = 0, bannerTxt = "";
-let cardLines = [], cardKind = "level";
-let bonusT = 0, bonusX = 0, bonusDir = 1, bonusGot = 0, bonusSpawnT = 0, bonusHearts = [];
+let cardLines = [];
 
 function genLevel(i){
   const L = LEVELS[i];
@@ -403,15 +374,11 @@ function genLevel(i){
       hearts.push({ x: x + k * 72,
         hy: base + (n > 1 ? Math.sin(k / (n - 1) * Math.PI) * 55 : 0),
         taken: false, ph: rand(0, 6.28),
-        carrot: n === 1 && Math.random() < 0.14,
-        gold: false });
+        carrot: n === 1 && Math.random() < 0.14 });
     }
     x += rand(140, 250) + n * 72;
   }
-  // stray golden hearts in the normal field
-  for (const h of hearts)
-    if (!h.carrot && Math.random() < 0.05) h.gold = true;
-  // bounce-flower pads, each with a high golden arc above it
+  // bounce-flower pads, each with a high arc of hearts above it
   pads = [];
   const padN = i >= 2 ? 3 : 2;
   for (let k = 0; k < padN; k++){
@@ -420,23 +387,14 @@ function genLevel(i){
     for (let m = 0; m < 5; m++)
       hearts.push({ x: px - 70 + m * 38,
         hy: 280 + Math.sin(m / 4 * Math.PI) * 50,
-        taken: false, ph: rand(0, 6.28), carrot: false, gold: m === 2 });
+        taken: false, ph: rand(0, 6.28), carrot: false });
   }
   hearts.sort((a, b) => a.x - b.x);
-  // butterflies carrying hearts
+  // butterflies drifting by (just to look pretty)
   flies = [];
   for (let k = 0; k < 4 + i; k++)
     flies.push({ x: rand(620, L.len - 220), ph: rand(0, 6.28),
-      c: pick(["#ffd166", "#c9a6ff", "#9fd8ff", "#ff8fb3"]), taken: false });
-  // sleepy snails to boop (level 2+)
-  snails = [];
-  if (i >= 1){
-    for (let k = 0; k < 2 + (i >= 3 ? 1 : 0); k++){
-      let sx = rand(700, L.len - 320), tries = 0;
-      while (tries++ < 8 && pads.some(p => Math.abs(p.x - sx) < 170)) sx = rand(700, L.len - 320);
-      snails.push({ x: sx, ph: rand(0, 6.28), boopT: -9 });
-    }
-  }
+      c: pick(["#ffd166", "#c9a6ff", "#9fd8ff", "#ff8fb3"]) });
   // scenery trees
   trees = [];
   if (L.tree)
@@ -455,16 +413,9 @@ function genLevel(i){
       stars.push({ x: rand(0, W), y: rand(0, GY * 0.85), r: rand(0.6, 1.8), ph: rand(0, 6.28) });
   pigX = L.len + W * 0.75;
   scroll = 0; by = 0; vy = 0; hops = 2; bxOff = 0; hugT = -1;
-  comboN = 0; comboT = 0; boostT = 0; airT = 0; landT = 0; wxT = 0;
+  airT = 0; landT = 0; wxT = 0;
   bannerT = 2.8; bannerTxt = "level " + (i + 1) + " · " + L.name;
   state = "play";
-}
-function startBonus(){
-  state = "bonus";
-  bonusT = 12; bonusGot = 0; bonusX = W * 0.3; bonusDir = 1;
-  bonusSpawnT = 0; bonusHearts = []; parts = [];
-  scroll = 0; by = 0; vy = 0; hops = 2;
-  comboN = 0; comboT = 0;
 }
 
 /* ============================ particles ================================ */
@@ -655,32 +606,16 @@ function drawBanner(){
 
 /* ============================ play/reach =============================== */
 function collectHeart(kind, hx, hy){
-  // kind: "heart" | "gold" | "fly" | "carrot"
-  if (kind === "carrot"){
-    boostT = 2.2; sBoost(); sNom();
-    popText(hx, hy - 14, "ZOOM!", "#ffe9b8", 17);
-    heartsGot++; burst(hx, hy, 4, 45);
-    return;
-  }
-  const worth = kind === "gold" ? 5 : kind === "fly" ? 2 : 1;
-  heartsGot += worth;
-  comboN = comboT > 0 ? comboN + 1 : 1;
-  comboT = 1.3;
-  if (kind === "gold"){ sGold(); popText(hx, hy - 16, "+5!", "#ffd166", 20); }
-  else if (kind === "fly"){ sHeart(); popText(hx, hy - 16, "+2!", "#c9a6ff", 17); }
+  // kind: "heart" | "carrot"
+  heartsGot++;
+  if (kind === "carrot"){ sNom(); popText(hx, hy - 14, "nom nom!", "#ffe9b8", 15); }
   else sHeart();
-  if (comboN >= 2){
-    sCombo(comboN);
-    popText(hx, hy - (kind === "heart" ? 16 : 36), "x" + comboN + " 💗", "#ffffff",
-            Math.min(15 + comboN * 2, 26));
-  }
-  burst(hx, hy, kind === "gold" ? 10 : 4, kind === "gold" ? 80 : 45);
+  burst(hx, hy, 4, 45);
 }
 function updatePlay(dt){
   const L = LEVELS[levelI];
-  const SPD = (205 + levelI * 12) + (boostT > 0 ? 115 : 0);
-  bannerT -= dt; comboT -= dt; boostT -= dt; landT -= dt;
-  if (comboT <= 0) comboN = 0;
+  const SPD = 205 + levelI * 12;
+  bannerT -= dt; landT -= dt;
   if (state === "play"){
     scroll += SPD * dt;
     if (scroll >= L.len) state = "reach";
@@ -700,7 +635,7 @@ function updatePlay(dt){
   if (hugT >= 0){
     hugT += dt;
     if (hugT > 0.8 && hugT < 0.85) burst(BX + bxOff + 30, GY - 90, 6, 60);
-    if (hugT > 1.7){ state = "card"; cardKind = "level"; cardLines = L.msg; }
+    if (hugT > 1.7){ state = "card"; cardLines = L.msg; }
   } else {
     vy += 2400 * dt; by += vy * dt;
     if (by > 0){
@@ -727,10 +662,6 @@ function updatePlay(dt){
              : pick(["#ffc2d4", "#ffd7e4", "#ffaec9"]) });
     }
   }
-  // boost sparkle trail
-  if (boostT > 0 && Math.random() < 0.55)
-    addPart({ x: bx - 24 + rand(-8, 8), y: GY + by - rand(8, 46), vx: -rand(60, 120), vy: rand(-30, 30),
-      g: 0, life: rand(0.3, 0.55), type: "spark", size: rand(1.5, 3), color: pick(["#ffd166", "#fff1b8", "#ff8fb3"]) });
   if (hugT < 0 && state === "play"){
     // bounce-flower pads
     for (const p of pads){
@@ -744,29 +675,8 @@ function updatePlay(dt){
             g: 120, life: rand(0.4, 0.8), type: "spark", size: rand(1.5, 3), color: "#ff8fb3" });
       }
     }
-    // sleepy snails boop you skyward
-    for (const s of snails){
-      const fx = s.x + Math.sin(t * 0.5 + s.ph) * 10 - scroll;
-      if (fx < -50 || fx > W + 50) continue;
-      if (Math.abs(fx - bx) < 33 && by > -36 && t - s.boopT > 1){
-        s.boopT = t; vy = -740; hops = 2; airT = 0.11;
-        sBoop(); popText(fx, GY - 64, "boop!", "#e8cba0", 16);
-      }
-    }
-    // butterflies
-    for (const f of flies){
-      if (f.taken) continue;
-      const fx = f.x - scroll + Math.sin(t * 0.7 + f.ph) * 42;
-      if (fx < -50 || fx > W + 50) continue;
-      const fy = GY - 195 - Math.sin(t * 1.3 + f.ph) * 48 - Math.cos(t * 0.8 + f.ph * 2) * 18;
-      const dx = fx - bx, dy = fy - bcy;
-      if (dx * dx + dy * dy < 1764){
-        f.taken = true;
-        collectHeart("fly", fx, fy);
-      }
-    }
   }
-  // hearts, golds & carrots
+  // hearts & carrots
   for (const h of hearts){
     if (h.taken) continue;
     const hx = h.x - scroll;
@@ -776,7 +686,7 @@ function updatePlay(dt){
     const dx = hx - bx, dy = hy - bcy;
     if (dx * dx + dy * dy < 1600){
       h.taken = true;
-      collectHeart(h.carrot ? "carrot" : h.gold ? "gold" : "heart", hx, hy);
+      collectHeart(h.carrot ? "carrot" : "heart", hx, hy);
     }
   }
   updateParts(dt);
@@ -790,30 +700,17 @@ function renderPlay(){
     if (fx < -50 || fx > W + 50) continue;
     drawPad(fx, GY + 2, p.hitT);
   }
-  // sleepy snails
-  for (const s of snails){
-    const fx = s.x + Math.sin(t * 0.5 + s.ph) * 10 - scroll;
-    if (fx < -50 || fx > W + 50) continue;
-    drawSnail(fx, GY + 2, s.boopT);
-  }
-  // hearts, golds & carrots
+  // hearts & carrots
   for (const h of hearts){
     if (h.taken) continue;
     const hx = h.x - scroll;
     if (hx < -30 || hx > W + 30) continue;
     const hy = GY - h.hy + Math.sin(t * 2 + h.ph) * 6;
     if (h.carrot) drawCarrot(hx, hy, 1.5);
-    else if (h.gold){
-      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(t * 5 + h.ph);
-      drawHeart(hx, hy, 3.1, "#ffd166");
-      ctx.globalAlpha = 1;
-      drawHeart(hx, hy, 2.3 + Math.sin(t * 5 + h.ph) * 0.2, "#ffc94d");
-    }
     else drawHeart(hx, hy, 1.9, "#ff5e8a");
   }
   // butterflies
   for (const f of flies){
-    if (f.taken) continue;
     const fx = f.x - scroll + Math.sin(t * 0.7 + f.ph) * 42;
     if (fx < -50 || fx > W + 50) continue;
     const fy = GY - 195 - Math.sin(t * 1.3 + f.ph) * 48 - Math.cos(t * 0.8 + f.ph * 2) * 18;
@@ -829,8 +726,8 @@ function renderPlay(){
   // bunny
   const hugging = hugT >= 0;
   drawBunny(BX + bxOff, GY + by, t,
-    { vy: vy, run: by === 0 && !hugging, happy: hugging || boostT > 0, face: 1,
-      lean: hugging ? -0.12 : boostT > 0 ? 0.08 : 0,
+    { vy: vy, run: by === 0 && !hugging, happy: hugging, face: 1,
+      lean: hugging ? -0.12 : 0,
       squash: landT > 0 ? landT / 0.14 : 0 });
   if (hugging){
     const cx = BX + bxOff + 31;
@@ -845,80 +742,9 @@ function renderPlay(){
         clamp((760 - scroll) / 320, 0, 1) * (0.6 + 0.4 * Math.sin(t * 5)));
 }
 
-/* =============================== bonus ================================= */
-function updateBonus(dt){
-  bonusT -= dt; comboT -= dt;
-  if (comboT <= 0) comboN = 0;
-  bonusX += bonusDir * 235 * dt;
-  if (bonusX > W - 56){ bonusX = W - 56; bonusDir = -1; }
-  if (bonusX < 56){ bonusX = 56; bonusDir = 1; }
-  vy += 2400 * dt; by += vy * dt;
-  if (by > 0){ by = 0; vy = 0; hops = 2; }
-  // rain hearts
-  bonusSpawnT -= dt;
-  if (bonusSpawnT <= 0 && bonusT > 1){
-    bonusSpawnT = 0.3;
-    bonusHearts.push({ x: rand(36, W - 36), y: -26, vy: rand(170, 260),
-      gold: Math.random() < 0.12, ph: rand(0, 6.28) });
-  }
-  const bcx = bonusX, bcy = GY + by - 36;
-  for (let i = bonusHearts.length - 1; i >= 0; i--){
-    const h = bonusHearts[i];
-    h.y += h.vy * dt;
-    const dx = h.x - bcx, dy = h.y - bcy;
-    if (dx * dx + dy * dy < 2116){
-      collectHeart(h.gold ? "gold" : "heart", h.x, h.y);
-      bonusGot += h.gold ? 5 : 1;
-      bonusHearts.splice(i, 1);
-    } else if (h.y > GY - 4){
-      addPart({ x: h.x, y: GY - 4, vx: 0, vy: -12, g: 0, life: 0.35, type: "puff", size: 3.5 });
-      bonusHearts.splice(i, 1);
-    }
-  }
-  // piglet cheers from the sideline
-  oinkT -= dt;
-  if (oinkT <= 0){
-    popText(W - 64, GY - 96, pick(["go bunny go!", "oink oink!", "wheee!", "💗💗💗"]), "#ffd7e4", 14);
-    sOink(); oinkT = rand(1.4, 2.4);
-  }
-  updateParts(dt);
-  if (bonusT <= 0){
-    sHug();
-    cardKind = "bonus";
-    cardLines = ["🎀 bonus round! 🎀", "you caught " + bonusGot + " hearts!",
-                 pick(["so sparkly!", "amazing, Gina!", "what a champ! 🐰"])];
-    state = "card";
-  }
-}
-function renderBonus(){
-  const g = ctx.createLinearGradient(0, 0, 0, GY);
-  g.addColorStop(0, "#ffc2dd"); g.addColorStop(1, "#fff3f9");
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, GY + 2);
-  drawHillLayer("#f6a8cc", 1.5, GY - 40, 0);
-  drawHillLayer("#ee94bd", 1.0, GY - 12, 0);
-  ctx.fillStyle = "#e786b1"; ctx.fillRect(0, GY, W, H - GY);
-  // falling hearts
-  for (const h of bonusHearts)
-    drawHeart(h.x, h.y, h.gold ? 2.4 : 2.0 + Math.sin(t * 6 + h.ph) * 0.15,
-              h.gold ? "#ffc94d" : "#ff5e8a");
-  // cheering piglet
-  drawPiglet(W - 58, GY, t, { face: -1, happy: true });
-  // bunny
-  drawBunny(bonusX, GY + by, t, { vy: vy, run: by === 0, face: bonusDir });
-  drawParts();
-  // header
-  const topPad = Math.max(18, H * 0.045);
-  drawHeart(26, topPad + 8, 1.5, "#ffffff");
-  txt("× " + heartsGot, 42, topPad + 8, 19, "#ffffff", "left");
-  txt(Math.max(0, Math.ceil(bonusT)) + "s", W - 30, topPad + 8, 22, "#ffffff", "right");
-  if (bonusT > 9.4)
-    txt("🎀 BONUS — catch the hearts! 🎀", W / 2, H * 0.27, Math.min(20, W * 0.05),
-        "#ffffff", "center", 700, clamp((bonusT - 9.4) / 0.4, 0, 1) * (0.7 + 0.3 * Math.sin(t * 5)));
-}
-
 /* =============================== card ================================== */
 function renderCard(){
-  if (cardKind === "bonus") renderBonus(); else renderPlay();
+  renderPlay();
   ctx.fillStyle = "rgba(40,30,60,0.35)"; ctx.fillRect(0, 0, W, H);
   const cw = Math.min(W * 0.86, 460), lines = cardLines;
   const lh = 34, ch = lines.length * lh + 110;
@@ -1028,19 +854,14 @@ function tap(x, y){
       if (hopCount % 5 === 2) popText(BX + bxOff, GY - 90, "boing!", "#ffffff", 15);
     }
   }
-  else if (state === "bonus"){
-    if (hops > 0){ vy = -780; hops--; by -= 0.001; sHop(); }
-  }
   else if (state === "card"){
     parts = [];
-    if (cardKind === "bonus"){ genLevel(levelI); return; }
     levelI++;
     if (levelI >= LEVELS.length){
       state = "finale"; scroll = 0; fwT = 0.6;
       stars = []; for (let s = 0; s < 70; s++)
         stars.push({ x: rand(0, W), y: rand(0, GY * 0.85), r: rand(0.6, 1.9), ph: rand(0, 6.28) });
     }
-    else if (levelI === 2 || levelI === 4) startBonus();
     else genLevel(levelI);
   }
   else if (state === "finale"){
@@ -1068,7 +889,6 @@ function loop(ts){
   const dt = clamp((ts - last) / 1000 || 0.016, 0.001, 0.033);
   last = ts; t += dt;
   if (state === "play" || state === "reach") { updatePlay(dt); renderPlay(); }
-  else if (state === "bonus") { updateBonus(dt); renderBonus(); }
   else if (state === "card") renderCard();
   else if (state === "finale") renderFinale(dt);
   else renderTitle();
