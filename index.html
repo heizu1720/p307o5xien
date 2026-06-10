@@ -102,6 +102,16 @@ const sHeart = () => { blip(740, 0.09, "sine", 0.09); blip(988, 0.14, "sine", 0.
 const sNom   = () => { blip(220, 0.08, "square", 0.05); blip(180, 0.08, "square", 0.05, 0.09); };
 const sHug   = () => [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.18, "sine", 0.09, i * 0.11));
 const sOink  = () => { blip(180, 0.07, "sawtooth", 0.05); blip(240, 0.1, "sawtooth", 0.05, 0.07); };
+const sCombo = n => { blip(440 + 110 * Math.min(n, 8), 0.09, "sine", 0.08);
+                      blip(660 + 110 * Math.min(n, 8), 0.12, "sine", 0.06, 0.06); };
+const sBoing = () => { blip(220, 0.12, "triangle", 0.09); blip(440, 0.14, "triangle", 0.08, 0.07);
+                       blip(660, 0.18, "triangle", 0.06, 0.14); };
+const sBoop  = () => { blip(150, 0.08, "square", 0.05); blip(260, 0.1, "square", 0.05, 0.06); };
+const sBoost = () => { blip(330, 0.1, "sawtooth", 0.05); blip(550, 0.1, "sawtooth", 0.05, 0.07);
+                       blip(880, 0.14, "sawtooth", 0.04, 0.14); };
+const sGold  = () => [880, 1109, 1319, 1760].forEach((f, i) => blip(f, 0.12, "sine", 0.07, i * 0.06));
+const sFw    = () => { blip(160, 0.4, "sine", 0.04); blip(1200, 0.25, "sine", 0.03, 0.05);
+                       blip(900, 0.3, "sine", 0.03, 0.12); };
 
 /* ============================ characters =============================== */
 /* origin = ground point under feet; face: 1 = facing right, -1 = left */
@@ -113,6 +123,7 @@ function drawBunny(x, y, t, o){
   ctx.save();
   ctx.translate(x, y); ctx.scale(face, 1);
   if (o.lean) ctx.rotate(o.lean);
+  if (o.squash) ctx.scale(1 + 0.11 * o.squash, 1 - 0.16 * o.squash);
   // shadow
   ctx.fillStyle = "rgba(60,60,90,0.13)";
   ctx.beginPath(); ctx.ellipse(0, 1, 26, 5, 0, 0, 7); ctx.fill();
@@ -207,28 +218,179 @@ function drawPiglet(x, y, t, o){
   ctx.restore();
 }
 
+/* =========================== world props =============================== */
+function drawButterfly(x, y, ph, c){
+  const flap = Math.abs(Math.sin(t * 9 + ph));
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = c;
+  ctx.beginPath(); ctx.ellipse(-4, -3, 6 * flap + 1.5, 4.6, -0.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( 4, -3, 6 * flap + 1.5, 4.6,  0.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-3.4, 3, 4.6 * flap + 1.2, 3.6, -0.9, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( 3.4, 3, 4.6 * flap + 1.2, 3.6,  0.9, 0, 7); ctx.fill();
+  ctx.fillStyle = "#5a4a55";
+  ctx.beginPath(); ctx.ellipse(0, 0, 1.7, 5.2, 0, 0, 7); ctx.fill();
+  drawHeart(0, 16, 1.0, "#ff5e8a");
+  ctx.restore();
+}
+function drawPad(x, y, hitT){
+  const k = clamp((t - hitT) / 0.35, 0, 1);
+  const bob = Math.sin(t * 2.5 + x * 0.01) * 2;
+  ctx.save(); ctx.translate(x, y + bob * 0.3);
+  ctx.scale(1 + 0.35 * (1 - k), 1 - 0.35 * (1 - k));
+  ctx.strokeStyle = "#5fae57"; ctx.lineWidth = 3.5; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -26); ctx.stroke();
+  ctx.fillStyle = "#5fae57";
+  ctx.beginPath(); ctx.ellipse(-7, -12, 7, 3, -0.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( 7, -14, 7, 3,  0.5, 0, 7); ctx.fill();
+  ctx.fillStyle = "#ff5e8a";
+  ctx.beginPath(); ctx.ellipse(0, -34, 10, 12, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#ff8fb3";
+  ctx.beginPath(); ctx.ellipse(-7, -33, 6, 10, -0.25, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( 7, -33, 6, 10,  0.25, 0, 7); ctx.fill();
+  ctx.restore();
+  txt("↑", x, y - 58 - bob, 15, "#ffffff", "center", 700, 0.45 + 0.35 * Math.sin(t * 4 + x));
+}
+function drawSnail(x, y, boopT){
+  const sq = clamp((t - boopT) / 0.4, 0, 1);
+  ctx.save(); ctx.translate(x, y);
+  ctx.scale(1 + 0.3 * (1 - sq), 1 - 0.3 * (1 - sq));
+  ctx.fillStyle = "#e8cba0";
+  ctx.beginPath(); ctx.ellipse(2, -5, 15, 5.5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(14, -10, 4.6, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#cdb084"; ctx.lineWidth = 1.4; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(15, -14); ctx.lineTo(17, -19); ctx.moveTo(12, -14); ctx.lineTo(12, -19); ctx.stroke();
+  ctx.fillStyle = "#cdb084";
+  ctx.beginPath(); ctx.arc(17, -19.5, 1.2, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(12, -19.5, 1.2, 0, 7); ctx.fill();
+  ctx.fillStyle = "#5a4a55";
+  ctx.beginPath(); ctx.arc(15.5, -10.5, 1.1, 0, 7); ctx.fill();
+  ctx.fillStyle = "#c9a0e8";
+  ctx.beginPath(); ctx.arc(-3, -11, 8.6, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#a87fc9"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(-3, -11, 4.6, 0.6, 5.2); ctx.stroke();
+  ctx.restore();
+}
+function drawTree(x, y, s, kind){
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  if (kind === "palm"){
+    ctx.strokeStyle = "#a5713d"; ctx.lineWidth = 7; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(6, -38, 18, -64); ctx.stroke();
+    ctx.fillStyle = "#5fae57";
+    for (let i = 0; i < 5; i++){
+      ctx.save(); ctx.translate(18, -66); ctx.rotate(-2.6 + i * 0.62);
+      ctx.beginPath(); ctx.ellipse(15, 0, 16, 5.2, 0, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = "#8a5c30";
+    ctx.beginPath(); ctx.arc(14, -61, 3.4, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(21, -58, 3.4, 0, 7); ctx.fill();
+  } else if (kind === "autumn"){
+    ctx.fillStyle = "#8a5c3a"; rr(-3.5, -36, 7, 38, 3); ctx.fill();
+    ctx.fillStyle = "#e07b39";
+    ctx.beginPath(); ctx.arc(-12, -42, 14, 0, 7); ctx.fill();
+    ctx.fillStyle = "#f0a04b";
+    ctx.beginPath(); ctx.arc(12, -44, 13, 0, 7); ctx.fill();
+    ctx.fillStyle = "#d4583b";
+    ctx.beginPath(); ctx.arc(0, -56, 15, 0, 7); ctx.fill();
+    ctx.fillStyle = "#eb8f4e";
+    ctx.beginPath(); ctx.arc(1, -40, 13, 0, 7); ctx.fill();
+  } else if (kind === "pinesnow"){
+    ctx.fillStyle = "#8a6248"; rr(-3, -13, 6, 15, 2); ctx.fill();
+    ctx.fillStyle = "#3f8a66";
+    for (let i = 0; i < 3; i++){
+      const w = 30 - i * 8, yy = -12 - i * 19;
+      ctx.beginPath(); ctx.moveTo(-w / 2, yy); ctx.lineTo(w / 2, yy); ctx.lineTo(0, yy - 26); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = "#ffffff";
+    for (let i = 0; i < 3; i++){
+      const yy = -38 - i * 19;
+      ctx.beginPath(); ctx.ellipse(0, yy + 1, 7 - i * 1.6, 3, 0, 0, 7); ctx.fill();
+    }
+  } else { // snowman
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(0, -12, 12, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -30, 8.5, 0, 7); ctx.fill();
+    ctx.fillStyle = "#4a3c46";
+    ctx.beginPath(); ctx.arc(-3, -32, 1.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, -32, 1.2, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ff9344";
+    ctx.beginPath(); ctx.moveTo(0, -30.5); ctx.lineTo(7, -28.5); ctx.lineTo(0, -27.5); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#ff8fb3"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-6, -24); ctx.quadraticCurveTo(0, -20, 6, -24); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawSea(){
+  const top = GY - 128, bot = GY - 20;
+  const g = ctx.createLinearGradient(0, top, 0, bot);
+  g.addColorStop(0, "#58b7e3"); g.addColorStop(1, "#8fd9f2");
+  ctx.fillStyle = g; ctx.fillRect(0, top, W, bot - top);
+  ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 2; ctx.lineCap = "round";
+  for (let row = 0; row < 3; row++){
+    const wy = top + 22 + row * 26, ph = t * 30 + scroll * 0.15 + row * 60;
+    ctx.beginPath();
+    for (let x = -10; x < W + 10; x += 9)
+      ctx.lineTo(x, wy + Math.sin((x + ph) / 24) * 2.6);
+    ctx.stroke();
+  }
+  // little sailboat
+  const span = W + 300;
+  let sbx = (W * 0.7 - scroll * 0.08 + t * 7) % span;
+  if (sbx < -150) sbx += span;
+  const sby = top + 34 + Math.sin(t * 1.6) * 2.5;
+  ctx.fillStyle = "#b3543f";
+  ctx.beginPath(); ctx.moveTo(sbx - 16, sby); ctx.lineTo(sbx + 16, sby);
+  ctx.lineTo(sbx + 10, sby + 8); ctx.lineTo(sbx - 10, sby + 8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#fffaf0";
+  ctx.beginPath(); ctx.moveTo(sbx, sby - 2); ctx.lineTo(sbx, sby - 24); ctx.lineTo(sbx + 14, sby - 4); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fillRect(0, bot - 3, W, 3);
+}
+
 /* ============================== levels ================================= */
 const LEVELS = [
-  { sky: ["#8fd5ff", "#eafaff"], hillFar: "#b9e598", hillNear: "#97d877",
+  { name: "spring meadow 🌼",
+    sky: ["#8fd5ff", "#eafaff"], hillFar: "#b9e598", hillNear: "#97d877",
     ground: "#7fcf64", grass: "#6cbd54", night: false, sunset: false,
     flow: ["#ff8fb3", "#ffd166", "#ffffff", "#c9a6ff"], len: 2300,
+    tree: null, weather: "petal", sea: false,
     msg: ["Gina! 💗", "You make my heart hop."] },
-  { sky: ["#ff9e7d", "#ffe2b0"], hillFar: "#e0b97f", hillNear: "#c9a05e",
-    ground: "#b78f50", grass: "#a37f45", night: false, sunset: true,
-    flow: ["#ff6f91", "#fff1b8", "#ffb3c8"], len: 2700,
+  { name: "sunny beach 🌊",
+    sky: ["#ffd28a", "#fff3d6"], hillFar: "#f2d9a0", hillNear: "#eccd8f",
+    ground: "#f0d8a2", grass: "#dfc183", night: false, sunset: false,
+    flow: ["#fff1b8", "#ffd1dc", "#fffefa"], len: 2650,
+    tree: "palm", weather: null, sea: true,
     msg: ["You're oink-credibly cute 🐷", "and I'm somebunny", "very lucky."] },
-  { sky: ["#23265c", "#56519c"], hillFar: "#3b3e7d", hillNear: "#2f3269",
+  { name: "autumn woods 🍂",
+    sky: ["#ffb86b", "#ffe7c2"], hillFar: "#d99a55", hillNear: "#c0833f",
+    ground: "#a8742f", grass: "#97682a", night: false, sunset: true,
+    flow: ["#ffb347", "#ff7b54", "#ffd166"], len: 2950,
+    tree: "autumn", weather: "leaf", sea: false,
+    msg: ["It's autumn... and guess what?", "I'm still FALLING", "for you 🍂"] },
+  { name: "snowy evening ⛄",
+    sky: ["#aeb9e8", "#e8ecfb"], hillFar: "#dfe6f7", hillNear: "#cdd7f0",
+    ground: "#e6ecfa", grass: "#c8d4ee", night: false, sunset: false,
+    flow: ["#b8c9ee", "#ffffff", "#dcc9f5"], len: 3250,
+    tree: "pinesnow", weather: "snow", sea: false,
+    msg: ["Snow one in the world", "warms my heart", "like you do ⛄"] },
+  { name: "starry night ⭐",
+    sky: ["#23265c", "#56519c"], hillFar: "#3b3e7d", hillNear: "#2f3269",
     ground: "#282b5e", grass: "#222451", night: true, sunset: false,
-    flow: ["#9fd8ff", "#ffe9a8", "#ffb3d9"], len: 3100,
+    flow: ["#9fd8ff", "#ffe9a8", "#ffb3d9"], len: 3500,
+    tree: null, weather: null, sea: false,
     msg: ["No matter the level,", "I will always", "hop to you. 💕"] },
 ];
 
 /* ============================ game state =============================== */
-let state = "title";       // title | play | reach | card | finale
+let state = "title";       // title | play | reach | bonus | card | finale
 let levelI = 0, scroll = 0, t = 0;
 let by = 0, vy = 0, hops = 2, hopCount = 0, bxOff = 0;
 let heartsGot = 0, hugT = -1, finT = 0, oinkT = 0;
 let hearts = [], flowers = [], clouds = [], stars = [], parts = [], pigX = 0;
+let flies = [], pads = [], snails = [], trees = [];
+let comboN = 0, comboT = 0, boostT = 0, airT = 0, landT = 0, wxT = 0, fwT = 0;
+let bannerT = 0, bannerTxt = "";
+let cardLines = [], cardKind = "level";
+let bonusT = 0, bonusX = 0, bonusDir = 1, bonusGot = 0, bonusSpawnT = 0, bonusHearts = [];
 
 function genLevel(i){
   const L = LEVELS[i];
@@ -241,10 +403,46 @@ function genLevel(i){
       hearts.push({ x: x + k * 72,
         hy: base + (n > 1 ? Math.sin(k / (n - 1) * Math.PI) * 55 : 0),
         taken: false, ph: rand(0, 6.28),
-        carrot: n === 1 && Math.random() < 0.14 });
+        carrot: n === 1 && Math.random() < 0.14,
+        gold: false });
     }
     x += rand(140, 250) + n * 72;
   }
+  // stray golden hearts in the normal field
+  for (const h of hearts)
+    if (!h.carrot && Math.random() < 0.05) h.gold = true;
+  // bounce-flower pads, each with a high golden arc above it
+  pads = [];
+  const padN = i >= 2 ? 3 : 2;
+  for (let k = 0; k < padN; k++){
+    const px = L.len * ((k + 1) / (padN + 1)) + rand(-100, 100);
+    pads.push({ x: px, hitT: -9 });
+    for (let m = 0; m < 5; m++)
+      hearts.push({ x: px - 70 + m * 38,
+        hy: 280 + Math.sin(m / 4 * Math.PI) * 50,
+        taken: false, ph: rand(0, 6.28), carrot: false, gold: m === 2 });
+  }
+  hearts.sort((a, b) => a.x - b.x);
+  // butterflies carrying hearts
+  flies = [];
+  for (let k = 0; k < 4 + i; k++)
+    flies.push({ x: rand(620, L.len - 220), ph: rand(0, 6.28),
+      c: pick(["#ffd166", "#c9a6ff", "#9fd8ff", "#ff8fb3"]), taken: false });
+  // sleepy snails to boop (level 2+)
+  snails = [];
+  if (i >= 1){
+    for (let k = 0; k < 2 + (i >= 3 ? 1 : 0); k++){
+      let sx = rand(700, L.len - 320), tries = 0;
+      while (tries++ < 8 && pads.some(p => Math.abs(p.x - sx) < 170)) sx = rand(700, L.len - 320);
+      snails.push({ x: sx, ph: rand(0, 6.28), boopT: -9 });
+    }
+  }
+  // scenery trees
+  trees = [];
+  if (L.tree)
+    for (let k = 0; k < 11; k++)
+      trees.push({ x: rand(300, L.len + W), s: rand(0.8, 1.35),
+        kind: L.tree === "pinesnow" && Math.random() < 0.2 ? "snowman" : L.tree });
   flowers = [];
   for (let f = 0; f < 50; f++)
     flowers.push({ x: rand(150, L.len + W), c: pick(L.flow), s: rand(0.7, 1.3) });
@@ -257,11 +455,20 @@ function genLevel(i){
       stars.push({ x: rand(0, W), y: rand(0, GY * 0.85), r: rand(0.6, 1.8), ph: rand(0, 6.28) });
   pigX = L.len + W * 0.75;
   scroll = 0; by = 0; vy = 0; hops = 2; bxOff = 0; hugT = -1;
+  comboN = 0; comboT = 0; boostT = 0; airT = 0; landT = 0; wxT = 0;
+  bannerT = 2.8; bannerTxt = "level " + (i + 1) + " · " + L.name;
   state = "play";
+}
+function startBonus(){
+  state = "bonus";
+  bonusT = 12; bonusGot = 0; bonusX = W * 0.3; bonusDir = 1;
+  bonusSpawnT = 0; bonusHearts = []; parts = [];
+  scroll = 0; by = 0; vy = 0; hops = 2;
+  comboN = 0; comboT = 0;
 }
 
 /* ============================ particles ================================ */
-function addPart(p){ p.maxLife = p.life; parts.push(p); }
+function addPart(p){ p.maxLife = p.life; if (parts.length > 260) parts.shift(); parts.push(p); }
 function burst(x, y, n, spread){
   for (let i = 0; i < n; i++)
     addPart({ x: x + rand(-10, 10), y: y + rand(-10, 10),
@@ -280,6 +487,7 @@ function updateParts(dt){
     p.x += p.vx * dt; p.y += p.vy * dt;
     if (p.wob) p.x += Math.sin(t * 4 + p.wob) * 40 * dt;
     p.life -= dt;
+    if (p.type === "flake" && p.y > GY + 10) p.life -= dt * 5;
     if (p.life <= 0) parts.splice(i, 1);
   }
 }
@@ -287,7 +495,35 @@ function drawParts(){
   for (const p of parts){
     const a = clamp(p.life / p.maxLife, 0, 1);
     if (p.type === "heart") drawHeart(p.x, p.y, p.size, p.color, a);
-    else txt(p.txt, p.x, p.y, p.px, p.color, "center", 700, a);
+    else if (p.type === "text") txt(p.txt, p.x, p.y, p.px, p.color, "center", 700, a);
+    else if (p.type === "spark"){
+      ctx.globalAlpha = a; ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (p.type === "puff"){
+      ctx.globalAlpha = a * 0.4; ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size + (1 - a) * 8, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (p.type === "flake"){
+      ctx.globalAlpha = Math.min(1, a * 2) * 0.9; ctx.fillStyle = p.color;
+      if (p.shape === "snow"){
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, 7); ctx.fill();
+      } else {
+        ctx.save(); ctx.translate(p.x, p.y);
+        ctx.rotate(Math.sin(t * 1.6 + p.rot) * 0.9 + p.rot);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.shape === "leaf" ? 4.4 : 3.2, p.shape === "leaf" ? 2.5 : 1.9, 0, 0, 7);
+        ctx.fill(); ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    } else if (p.type === "streak"){
+      ctx.globalAlpha = a; ctx.strokeStyle = "#fff7d9"; ctx.lineWidth = 2; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 0.07, p.y - p.vy * 0.07); ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(p.x, p.y, 1.8, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
   }
 }
 
@@ -308,6 +544,11 @@ function drawSky(L){
     ctx.beginPath(); ctx.arc(W * 0.8, H * 0.14, 26, 0, 7); ctx.fill();
     ctx.fillStyle = L.sky[0];
     ctx.beginPath(); ctx.arc(W * 0.8 + 11, H * 0.14 - 7, 21, 0, 7); ctx.fill();
+    // shooting stars!
+    if (Math.random() < 0.006)
+      addPart({ x: rand(W * 0.25, W * 1.05), y: rand(20, H * 0.3),
+        vx: -rand(260, 430), vy: rand(100, 180), g: 0,
+        life: rand(0.6, 0.9), type: "streak" });
   } else {
     const sx = W * 0.82, sy = L.sunset ? H * 0.3 : H * 0.15, sr = L.sunset ? 38 : 30;
     ctx.fillStyle = L.sunset ? "rgba(255,240,210,0.95)" : "rgba(255,250,200,0.95)";
@@ -370,9 +611,20 @@ function drawGround(L){
 }
 function drawScene(L){
   drawSky(L);
-  drawHillLayer(L.hillFar, 1.5, GY - 40, 0.25);
-  drawHillLayer(L.hillNear, 1.0, GY - 12, 0.5);
+  if (L.sea){
+    drawSea();
+    drawHillLayer(L.hillNear, 1.0, GY - 12, 0.5);
+  } else {
+    drawHillLayer(L.hillFar, 1.5, GY - 40, 0.25);
+    drawHillLayer(L.hillNear, 1.0, GY - 12, 0.5);
+  }
   drawGround(L);
+  // scenery trees scroll with the ground
+  for (const tr of trees){
+    const fx = tr.x - scroll;
+    if (fx < -90 || fx > W + 90) continue;
+    drawTree(fx, GY + 4, tr.s, tr.kind);
+  }
 }
 
 /* =============================== HUD =================================== */
@@ -388,17 +640,52 @@ function drawHUD(L){
   ctx.fillStyle = "#ff8fb3";
   rr(px0, py, Math.max(12, pw * p), 12, 6); ctx.fill();
   txt("🐷", px0 + pw + 16, py + 6, 15, "#fff");
+  txt((levelI + 1) + "/" + LEVELS.length, px0 - 16, py + 7, 13, "rgba(255,255,255,0.85)", "right");
+}
+function drawBanner(){
+  if (bannerT <= 0) return;
+  const a = clamp(Math.min(bannerT, 2.8 - bannerT) / 0.4, 0, 1);
+  const bw = Math.min(W * 0.78, 330);
+  ctx.globalAlpha = a * 0.85;
+  ctx.fillStyle = "#ffffff";
+  rr(W / 2 - bw / 2, H * 0.27 - 24, bw, 48, 24); ctx.fill();
+  ctx.globalAlpha = 1;
+  txt(bannerTxt, W / 2, H * 0.27 + 1, 19, "#b3486e", "center", 700, a);
 }
 
 /* ============================ play/reach =============================== */
+function collectHeart(kind, hx, hy){
+  // kind: "heart" | "gold" | "fly" | "carrot"
+  if (kind === "carrot"){
+    boostT = 2.2; sBoost(); sNom();
+    popText(hx, hy - 14, "ZOOM!", "#ffe9b8", 17);
+    heartsGot++; burst(hx, hy, 4, 45);
+    return;
+  }
+  const worth = kind === "gold" ? 5 : kind === "fly" ? 2 : 1;
+  heartsGot += worth;
+  comboN = comboT > 0 ? comboN + 1 : 1;
+  comboT = 1.3;
+  if (kind === "gold"){ sGold(); popText(hx, hy - 16, "+5!", "#ffd166", 20); }
+  else if (kind === "fly"){ sHeart(); popText(hx, hy - 16, "+2!", "#c9a6ff", 17); }
+  else sHeart();
+  if (comboN >= 2){
+    sCombo(comboN);
+    popText(hx, hy - (kind === "heart" ? 16 : 36), "x" + comboN + " 💗", "#ffffff",
+            Math.min(15 + comboN * 2, 26));
+  }
+  burst(hx, hy, kind === "gold" ? 10 : 4, kind === "gold" ? 80 : 45);
+}
 function updatePlay(dt){
   const L = LEVELS[levelI];
-  const SPD = 205;
+  const SPD = (205 + levelI * 12) + (boostT > 0 ? 115 : 0);
+  bannerT -= dt; comboT -= dt; boostT -= dt; landT -= dt;
+  if (comboT <= 0) comboN = 0;
   if (state === "play"){
     scroll += SPD * dt;
     if (scroll >= L.len) state = "reach";
   } else { // reach
-    if (pigX - scroll > W * 0.68) scroll += SPD * dt;
+    if (pigX - scroll > W * 0.68) scroll += (205 + levelI * 12) * dt;
     else if (hugT < 0){
       bxOff += 175 * dt;
       // piglet oinks while waiting
@@ -413,13 +700,73 @@ function updatePlay(dt){
   if (hugT >= 0){
     hugT += dt;
     if (hugT > 0.8 && hugT < 0.85) burst(BX + bxOff + 30, GY - 90, 6, 60);
-    if (hugT > 1.7) state = "card";
+    if (hugT > 1.7){ state = "card"; cardKind = "level"; cardLines = L.msg; }
   } else {
     vy += 2400 * dt; by += vy * dt;
-    if (by > 0){ by = 0; vy = 0; hops = 2; }
+    if (by > 0){
+      if (airT > 0.1){
+        landT = 0.14;
+        addPart({ x: BX + bxOff - 14, y: GY - 2, vx: -30, vy: -16, g: 0, life: 0.4, type: "puff", size: 4 });
+        addPart({ x: BX + bxOff + 14, y: GY - 2, vx: 30, vy: -16, g: 0, life: 0.4, type: "puff", size: 4 });
+      }
+      by = 0; vy = 0; hops = 2; airT = 0;
+    } else airT += dt;
   }
-  // collect
   const bx = BX + bxOff, bcy = GY + by - 36;
+  // weather
+  if (L.weather){
+    wxT -= dt;
+    if (wxT <= 0){
+      wxT = L.weather === "snow" ? 0.09 : 0.17;
+      addPart({ x: rand(-20, W + 20), y: -12, vx: rand(-8, 8),
+        vy: L.weather === "snow" ? rand(34, 60) : rand(26, 46), g: 0,
+        life: rand(8, 12), type: "flake", shape: L.weather, rot: rand(0, 6.28),
+        wob: rand(0, 6.28),
+        color: L.weather === "snow" ? "#ffffff"
+             : L.weather === "leaf" ? pick(["#e07b39", "#d4583b", "#f0a04b"])
+             : pick(["#ffc2d4", "#ffd7e4", "#ffaec9"]) });
+    }
+  }
+  // boost sparkle trail
+  if (boostT > 0 && Math.random() < 0.55)
+    addPart({ x: bx - 24 + rand(-8, 8), y: GY + by - rand(8, 46), vx: -rand(60, 120), vy: rand(-30, 30),
+      g: 0, life: rand(0.3, 0.55), type: "spark", size: rand(1.5, 3), color: pick(["#ffd166", "#fff1b8", "#ff8fb3"]) });
+  if (hugT < 0 && state === "play"){
+    // bounce-flower pads
+    for (const p of pads){
+      const fx = p.x - scroll;
+      if (fx < -50 || fx > W + 50) continue;
+      if (Math.abs(fx - bx) < 32 && by > -8 && t - p.hitT > 0.9){
+        p.hitT = t; vy = -1300; by = -0.01; hops = 2; airT = 0.11;
+        sBoing(); popText(bx, GY - 110, "wheee!", "#ffffff", 18);
+        for (let s = 0; s < 6; s++)
+          addPart({ x: fx + rand(-12, 12), y: GY - 30, vx: rand(-60, 60), vy: -rand(60, 160),
+            g: 120, life: rand(0.4, 0.8), type: "spark", size: rand(1.5, 3), color: "#ff8fb3" });
+      }
+    }
+    // sleepy snails boop you skyward
+    for (const s of snails){
+      const fx = s.x + Math.sin(t * 0.5 + s.ph) * 10 - scroll;
+      if (fx < -50 || fx > W + 50) continue;
+      if (Math.abs(fx - bx) < 33 && by > -36 && t - s.boopT > 1){
+        s.boopT = t; vy = -740; hops = 2; airT = 0.11;
+        sBoop(); popText(fx, GY - 64, "boop!", "#e8cba0", 16);
+      }
+    }
+    // butterflies
+    for (const f of flies){
+      if (f.taken) continue;
+      const fx = f.x - scroll + Math.sin(t * 0.7 + f.ph) * 42;
+      if (fx < -50 || fx > W + 50) continue;
+      const fy = GY - 195 - Math.sin(t * 1.3 + f.ph) * 48 - Math.cos(t * 0.8 + f.ph * 2) * 18;
+      const dx = fx - bx, dy = fy - bcy;
+      if (dx * dx + dy * dy < 1764){
+        f.taken = true;
+        collectHeart("fly", fx, fy);
+      }
+    }
+  }
+  // hearts, golds & carrots
   for (const h of hearts){
     if (h.taken) continue;
     const hx = h.x - scroll;
@@ -428,10 +775,8 @@ function updatePlay(dt){
     const hy = GY - h.hy + Math.sin(t * 2 + h.ph) * 6;
     const dx = hx - bx, dy = hy - bcy;
     if (dx * dx + dy * dy < 1600){
-      h.taken = true; heartsGot++;
-      if (h.carrot){ sNom(); popText(hx, hy - 14, "nom nom!", "#ffe9b8", 15); }
-      else sHeart();
-      burst(hx, hy, 4, 45);
+      h.taken = true;
+      collectHeart(h.carrot ? "carrot" : h.gold ? "gold" : "heart", hx, hy);
     }
   }
   updateParts(dt);
@@ -439,14 +784,40 @@ function updatePlay(dt){
 function renderPlay(){
   const L = LEVELS[levelI];
   drawScene(L);
-  // hearts & carrots
+  // bounce-flower pads
+  for (const p of pads){
+    const fx = p.x - scroll;
+    if (fx < -50 || fx > W + 50) continue;
+    drawPad(fx, GY + 2, p.hitT);
+  }
+  // sleepy snails
+  for (const s of snails){
+    const fx = s.x + Math.sin(t * 0.5 + s.ph) * 10 - scroll;
+    if (fx < -50 || fx > W + 50) continue;
+    drawSnail(fx, GY + 2, s.boopT);
+  }
+  // hearts, golds & carrots
   for (const h of hearts){
     if (h.taken) continue;
     const hx = h.x - scroll;
     if (hx < -30 || hx > W + 30) continue;
     const hy = GY - h.hy + Math.sin(t * 2 + h.ph) * 6;
     if (h.carrot) drawCarrot(hx, hy, 1.5);
+    else if (h.gold){
+      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(t * 5 + h.ph);
+      drawHeart(hx, hy, 3.1, "#ffd166");
+      ctx.globalAlpha = 1;
+      drawHeart(hx, hy, 2.3 + Math.sin(t * 5 + h.ph) * 0.2, "#ffc94d");
+    }
     else drawHeart(hx, hy, 1.9, "#ff5e8a");
+  }
+  // butterflies
+  for (const f of flies){
+    if (f.taken) continue;
+    const fx = f.x - scroll + Math.sin(t * 0.7 + f.ph) * 42;
+    if (fx < -50 || fx > W + 50) continue;
+    const fy = GY - 195 - Math.sin(t * 1.3 + f.ph) * 48 - Math.cos(t * 0.8 + f.ph * 2) * 18;
+    drawButterfly(fx, fy, f.ph, f.c);
   }
   // piglet waiting at the end
   const px = pigX - scroll;
@@ -458,24 +829,98 @@ function renderPlay(){
   // bunny
   const hugging = hugT >= 0;
   drawBunny(BX + bxOff, GY + by, t,
-    { vy: vy, run: by === 0 && !hugging, happy: hugging, face: 1, lean: hugging ? -0.12 : 0 });
+    { vy: vy, run: by === 0 && !hugging, happy: hugging || boostT > 0, face: 1,
+      lean: hugging ? -0.12 : boostT > 0 ? 0.08 : 0,
+      squash: landT > 0 ? landT / 0.14 : 0 });
   if (hugging){
     const cx = BX + bxOff + 31;
     drawHeart(cx, GY - 105 - Math.sin(t * 4) * 4, 2.6 + Math.sin(t * 6) * 0.3, "#ff4d7e");
   }
   drawParts();
   drawHUD(L);
+  drawBanner();
   // gentle hint, first level only — fades out as she plays
   if (levelI === 0 && scroll < 760 && hugT < 0)
     txt("tap to hop!", BX + 14, GY - 138, 19, "#ffffff", "center", 700,
         clamp((760 - scroll) / 320, 0, 1) * (0.6 + 0.4 * Math.sin(t * 5)));
 }
 
+/* =============================== bonus ================================= */
+function updateBonus(dt){
+  bonusT -= dt; comboT -= dt;
+  if (comboT <= 0) comboN = 0;
+  bonusX += bonusDir * 235 * dt;
+  if (bonusX > W - 56){ bonusX = W - 56; bonusDir = -1; }
+  if (bonusX < 56){ bonusX = 56; bonusDir = 1; }
+  vy += 2400 * dt; by += vy * dt;
+  if (by > 0){ by = 0; vy = 0; hops = 2; }
+  // rain hearts
+  bonusSpawnT -= dt;
+  if (bonusSpawnT <= 0 && bonusT > 1){
+    bonusSpawnT = 0.3;
+    bonusHearts.push({ x: rand(36, W - 36), y: -26, vy: rand(170, 260),
+      gold: Math.random() < 0.12, ph: rand(0, 6.28) });
+  }
+  const bcx = bonusX, bcy = GY + by - 36;
+  for (let i = bonusHearts.length - 1; i >= 0; i--){
+    const h = bonusHearts[i];
+    h.y += h.vy * dt;
+    const dx = h.x - bcx, dy = h.y - bcy;
+    if (dx * dx + dy * dy < 2116){
+      collectHeart(h.gold ? "gold" : "heart", h.x, h.y);
+      bonusGot += h.gold ? 5 : 1;
+      bonusHearts.splice(i, 1);
+    } else if (h.y > GY - 4){
+      addPart({ x: h.x, y: GY - 4, vx: 0, vy: -12, g: 0, life: 0.35, type: "puff", size: 3.5 });
+      bonusHearts.splice(i, 1);
+    }
+  }
+  // piglet cheers from the sideline
+  oinkT -= dt;
+  if (oinkT <= 0){
+    popText(W - 64, GY - 96, pick(["go bunny go!", "oink oink!", "wheee!", "💗💗💗"]), "#ffd7e4", 14);
+    sOink(); oinkT = rand(1.4, 2.4);
+  }
+  updateParts(dt);
+  if (bonusT <= 0){
+    sHug();
+    cardKind = "bonus";
+    cardLines = ["🎀 bonus round! 🎀", "you caught " + bonusGot + " hearts!",
+                 pick(["so sparkly!", "amazing, Gina!", "what a champ! 🐰"])];
+    state = "card";
+  }
+}
+function renderBonus(){
+  const g = ctx.createLinearGradient(0, 0, 0, GY);
+  g.addColorStop(0, "#ffc2dd"); g.addColorStop(1, "#fff3f9");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, GY + 2);
+  drawHillLayer("#f6a8cc", 1.5, GY - 40, 0);
+  drawHillLayer("#ee94bd", 1.0, GY - 12, 0);
+  ctx.fillStyle = "#e786b1"; ctx.fillRect(0, GY, W, H - GY);
+  // falling hearts
+  for (const h of bonusHearts)
+    drawHeart(h.x, h.y, h.gold ? 2.4 : 2.0 + Math.sin(t * 6 + h.ph) * 0.15,
+              h.gold ? "#ffc94d" : "#ff5e8a");
+  // cheering piglet
+  drawPiglet(W - 58, GY, t, { face: -1, happy: true });
+  // bunny
+  drawBunny(bonusX, GY + by, t, { vy: vy, run: by === 0, face: bonusDir });
+  drawParts();
+  // header
+  const topPad = Math.max(18, H * 0.045);
+  drawHeart(26, topPad + 8, 1.5, "#ffffff");
+  txt("× " + heartsGot, 42, topPad + 8, 19, "#ffffff", "left");
+  txt(Math.max(0, Math.ceil(bonusT)) + "s", W - 30, topPad + 8, 22, "#ffffff", "right");
+  if (bonusT > 9.4)
+    txt("🎀 BONUS — catch the hearts! 🎀", W / 2, H * 0.27, Math.min(20, W * 0.05),
+        "#ffffff", "center", 700, clamp((bonusT - 9.4) / 0.4, 0, 1) * (0.7 + 0.3 * Math.sin(t * 5)));
+}
+
 /* =============================== card ================================== */
 function renderCard(){
-  renderPlay();
+  if (cardKind === "bonus") renderBonus(); else renderPlay();
   ctx.fillStyle = "rgba(40,30,60,0.35)"; ctx.fillRect(0, 0, W, H);
-  const cw = Math.min(W * 0.86, 460), lines = LEVELS[levelI].msg;
+  const cw = Math.min(W * 0.86, 460), lines = cardLines;
   const lh = 34, ch = lines.length * lh + 110;
   const cx = (W - cw) / 2, cy = (H - ch) / 2 - H * 0.04;
   ctx.fillStyle = "rgba(255,255,255,0.97)";
@@ -491,6 +936,8 @@ function renderCard(){
 function renderTitle(){
   drawScene(LEVELS[0]);
   const cy = GY - 4;
+  drawButterfly(W * 0.2 + Math.sin(t * 0.8) * 24, GY - 170 - Math.sin(t * 1.4) * 26, 0, "#ffd166");
+  drawButterfly(W * 0.78 + Math.sin(t * 0.6 + 2) * 28, GY - 215 - Math.sin(t * 1.1 + 1) * 22, 3, "#c9a6ff");
   drawBunny(W / 2 - 72, cy, t, { face: 1, happy: true });
   drawPiglet(W / 2 + 72, cy, t, { face: -1, happy: true });
   drawHeart(W / 2, cy - 92 - Math.sin(t * 3) * 6, 2.4 + Math.sin(t * 5) * 0.25, "#ff4d7e");
@@ -508,13 +955,30 @@ function renderTitle(){
 }
 
 /* ============================== finale ================================= */
+function firework(x, y, big){
+  const n = big ? 22 : 15, cols = ["#ff8fb3", "#ffd166", "#c9a6ff", "#9fd8ff", "#ff5e8a"];
+  const c = pick(cols);
+  for (let i = 0; i < n; i++){
+    const a = i / n * Math.PI * 2, sp = rand(70, big ? 160 : 120);
+    addPart({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 20,
+      g: 50, life: rand(0.8, 1.4), type: "heart",
+      size: rand(0.5, big ? 1.3 : 1.0), color: Math.random() < 0.7 ? c : pick(cols) });
+  }
+  sFw();
+}
 function renderFinale(dt){
-  const L = LEVELS[2];
+  const L = LEVELS[LEVELS.length - 1];
   scroll = 0;
   drawSky(L);
   drawHillLayer(L.hillFar, 1.5, GY - 40, 0);
   drawHillLayer(L.hillNear, 1.0, GY - 12, 0);
   ctx.fillStyle = L.ground; ctx.fillRect(0, GY, W, H - GY);
+  // heart fireworks over the picnic
+  fwT -= dt;
+  if (fwT <= 0){
+    fwT = rand(1.0, 1.8);
+    firework(rand(W * 0.15, W * 0.85), rand(H * 0.32, H * 0.52), false);
+  }
   // fireflies
   if (Math.random() < 0.05)
     addPart({ x: rand(20, W - 20), y: rand(GY - 160, GY + 30), vx: rand(-12, 12),
@@ -564,16 +1028,24 @@ function tap(x, y){
       if (hopCount % 5 === 2) popText(BX + bxOff, GY - 90, "boing!", "#ffffff", 15);
     }
   }
+  else if (state === "bonus"){
+    if (hops > 0){ vy = -780; hops--; by -= 0.001; sHop(); }
+  }
   else if (state === "card"){
-    parts = []; levelI++;
-    if (levelI < LEVELS.length) genLevel(levelI);
-    else { state = "finale"; genLevel.lastT = 0; scroll = 0;
-           stars = []; for (let s = 0; s < 70; s++)
-             stars.push({ x: rand(0, W), y: rand(0, GY * 0.85), r: rand(0.6, 1.9), ph: rand(0, 6.28) }); }
+    parts = [];
+    if (cardKind === "bonus"){ genLevel(levelI); return; }
+    levelI++;
+    if (levelI >= LEVELS.length){
+      state = "finale"; scroll = 0; fwT = 0.6;
+      stars = []; for (let s = 0; s < 70; s++)
+        stars.push({ x: rand(0, W), y: rand(0, GY * 0.85), r: rand(0.6, 1.9), ph: rand(0, 6.28) });
+    }
+    else if (levelI === 2 || levelI === 4) startBonus();
+    else genLevel(levelI);
   }
   else if (state === "finale"){
     if (y > H * 0.92){ state = "title"; parts = []; return; }
-    burst(x, y, 7, 70); sHeart();
+    firework(x, y, true); sHeart();
     if (Math.random() < 0.4)
       popText(x, y - 30, pick(["oink! 💕", "hop hop 💗", "love you!", "boing!", "🐰💗🐷"]),
               "#ffd7e4", 16);
@@ -596,6 +1068,7 @@ function loop(ts){
   const dt = clamp((ts - last) / 1000 || 0.016, 0.001, 0.033);
   last = ts; t += dt;
   if (state === "play" || state === "reach") { updatePlay(dt); renderPlay(); }
+  else if (state === "bonus") { updateBonus(dt); renderBonus(); }
   else if (state === "card") renderCard();
   else if (state === "finale") renderFinale(dt);
   else renderTitle();
